@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "constants.hpp"
 #include "canvas.hpp"
@@ -25,6 +26,8 @@ class Program
     glm::vec3 sphereCenter;
     glm::vec3 sphereCenter2;
     float phase = 0;
+    sf::Text fps;
+    sf::Font font;
 
 public:
     Program() : cameraPosition(0, 0.5, 0), sphereCenter(0.5, 0.25, 2), sphereCenter2(-0.5, 0.25, 2)
@@ -34,19 +37,30 @@ public:
                                       "Path Tracer!!");
 
         window->setFramerateLimit(60);
+        font.loadFromFile("resources/JetBrainsMono-Regular.ttf");
+        fps.setFont(font);
+        fps.setFillColor(sf::Color(255, 0, 0));
+        fps.setOutlineThickness(1.f);
+        fps.setOutlineColor(sf::Color(0, 0, 0));
+        fps.setString("CADORNA!!!");
+        fps.setCharacterSize(24);
     }
 
     void runMainLoop(void)
     {
         sf::Clock clock;
+        char fpsString[500] = "";
         while (window->isOpen())
         {
             float dt = clock.getElapsedTime().asSeconds();
+            snprintf(fpsString, 500, "fps: %.2f", 1.f / dt);
+            fps.setString(sf::String(fpsString));
             clock.restart();
             checkExitConditions();
             renderScene(dt);
 
             canvas.draw(window);
+            window->draw(fps);
             window->display();
         }
     }
