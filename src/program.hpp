@@ -15,13 +15,22 @@
 #include <glm/glm.hpp>
 #include <threads.h>
 
-#define PTHREAD_COUNT 2
+#define PTHREAD_COUNT 17
+
+class Program;
 
 struct PthreadParams
 {
     float dt;
     float start;
     float end;
+    float incY;
+    float incX;
+    glm::vec3 sphereCenter;
+    glm::vec3 sphereCenter2;
+    glm::vec3 cameraPosition;
+    pthread_barrier_t *barrierStart, *barrierEnd;
+    Canvas *canvas;
 };
 
 class Program
@@ -29,10 +38,6 @@ class Program
     sf::RenderWindow *window;
     glm::vec3 cameraPosition;
     Canvas canvas;
-    // beyond this distance, we asume the ray didn't hit anything
-    float maxDistance = 100.0;
-    float minDistance = 0.01;
-    int maxSteps = 100;
     glm::vec3 sphereCenter;
     glm::vec3 sphereCenter2;
     float phase = 0;
@@ -42,7 +47,7 @@ class Program
     float incY = 2.f / SCREEN_HEIGHT;
 
     pthread_barrier_t barrierStart, barrierEnd;
-    PthreadParams pthreadParams;
+    PthreadParams pthreadParams[PTHREAD_COUNT];
     pthread_t pthreadIds[PTHREAD_COUNT];
 
 public:
@@ -52,25 +57,31 @@ public:
                                           SCREEN_WIDTH * WINDOW_RATIO, SCREEN_HEIGHT * WINDOW_RATIO),
                                       "Path Tracer!!");
 
-        window->setFramerateLimit(60);
+        // window->setFramerateLimit(60);
         font.loadFromFile("resources/JetBrainsMono-Regular.ttf");
         fps.setFont(font);
         fps.setFillColor(sf::Color(255, 0, 0));
         fps.setOutlineThickness(1.f);
         fps.setOutlineColor(sf::Color(0, 0, 0));
-        fps.setString("CADORNA!!!");
         fps.setCharacterSize(24);
 
-        pthreadParams.dt = 0;
-        pthreadParams.start = 0.f;
-        pthreadParams.end = 0.f;
+        pthread_barrier_init(&barrierStart, NULL, PTHREAD_COUNT + 1);
+        pthread_barrier_init(&barrierEnd, NULL, PTHREAD_COUNT + 1);
 
-        pthread_barrier_init(&barrierStart, NULL, 8);
-        pthread_barrier_init(&barrierEnd, NULL, 8);
-
+        float step = 2.0 / PTHREAD_COUNT;
         for (int i = 0; i < PTHREAD_COUNT; i++)
         {
-            pthread_create(&pthreadIds[i], NULL, renderSlice, &pthreadParams);
+            pthreadParams[i].start = -1 + step * i;
+            pthreadParams[i].end = -1 + step * (i + 1);
+            pthreadParams[i].sphereCenter = sphereCenter;
+            pthreadParams[i].sphereCenter2 = sphereCenter2;
+            pthreadParams[i].incY = incY;
+            pthreadParams[i].incX = incX;
+            pthreadParams[i].barrierStart = &barrierStart;
+            pthreadParams[i].barrierEnd = &barrierEnd;
+            pthreadParams[i].cameraPosition = cameraPosition;
+            pthreadParams[i].canvas = &canvas;
+            pthread_create(&pthreadIds[i], NULL, renderSlice, &pthreadParams[i]);
         }
     }
 
@@ -97,37 +108,55 @@ private:
     static void *renderSlice(void *params)
     {
         PthreadParams *pParams = (PthreadParams *)params;
-        printf("rendering slice!!\n");
+        float phase = 0;
+        while (1)
+        {
+            pthread_barrier_wait(pParams->barrierStart);
+
+            phase += pParams->dt * 5.0;
+            pParams->sphereCenter2.x = glm::sin(phase) * 0.5;
+            pParams->sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
+
+            pParams->sphereCenter.x = glm::sin(phase + glm::pi<float>()) * 0.5;
+            pParams->sphereCenter.z = glm::cos(phase + glm::pi<float>()) * 0.5 + 2;
+
+            for (float y = pParams->end; y > pParams->start; y -= pParams->incY)
+            {
+                for (float x = -1.0; x < 1.0; x += pParams->incX)
+                {
+                    float distance = glm::min(255.0, rayMarch(pParams->cameraPosition, glm::vec3(x, y, 1.0), pParams) * 100.0);
+                    pParams->canvas->setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, sf::Color(distance, distance, distance, 255));
+                }
+            }
+            pthread_barrier_wait(pParams->barrierEnd);
+        }
         return NULL;
     }
 
     void renderScene(float deltaTime)
     {
-        phase += deltaTime * 5.0;
-        sphereCenter2.x = glm::sin(phase) * 0.5;
-        sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
-
-        sphereCenter.x = glm::sin(phase + glm::pi<float>()) * 0.5;
-        sphereCenter.z = glm::cos(phase + glm::pi<float>()) * 0.5 + 2;
-        for (float y = 1.0; y > -1.0; y -= incY)
+        for (int i = 0; i < PTHREAD_COUNT; i++)
         {
-            for (float x = -1.0; x < 1.0; x += incX)
-            {
-                float distance = glm::min(255.0, rayMarch(cameraPosition, glm::vec3(x, y, 1.0)) * 100.0);
-                canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, sf::Color(distance, distance, distance, 255));
-            }
+            pthreadParams[i].dt = deltaTime;
         }
+
+        pthread_barrier_wait(&barrierStart);
+        pthread_barrier_wait(&barrierEnd);
     }
 
-    float rayMarch(glm::vec3 rayOrigin, glm::vec3 screenPosition)
+    static float rayMarch(glm::vec3 rayOrigin, glm::vec3 screenPosition, PthreadParams *params)
     {
+        // beyond this distance, we asume the ray didn't hit anything
+        static float maxDistance = 100.0;
+        static float minDistance = 0.01;
+        static int maxSteps = 100;
         auto rayDirection = glm::normalize(screenPosition - rayOrigin);
         float distanceToScene = 0;
         float distanceToOrigin = 0;
         for (int i = 0; i < maxSteps; i++)
         {
             rayOrigin = rayOrigin + rayDirection * distanceToScene;
-            distanceToScene = distance(rayOrigin);
+            distanceToScene = distance(rayOrigin, params);
             distanceToOrigin += distanceToScene;
             if (distanceToScene < minDistance || distanceToOrigin > maxDistance)
                 break;
@@ -135,13 +164,13 @@ private:
         return distanceToOrigin;
     }
 
-    float distance(glm::vec3 rayOrigin)
+    static float distance(glm::vec3 rayOrigin, PthreadParams *params)
     {
 
         float sphereRadius = .50f;
 
-        auto distanceToSphere = glm::length(rayOrigin - sphereCenter) - sphereRadius;
-        auto distanceToSphere2 = glm::length(rayOrigin - sphereCenter2) - sphereRadius;
+        auto distanceToSphere = glm::length(rayOrigin - params->sphereCenter) - sphereRadius;
+        auto distanceToSphere2 = glm::length(rayOrigin - params->sphereCenter2) - sphereRadius;
 
         return glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere));
     }
