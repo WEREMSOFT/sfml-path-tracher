@@ -13,6 +13,16 @@
 #include "constants.hpp"
 #include "canvas.hpp"
 #include <glm/glm.hpp>
+#include <threads.h>
+
+#define PTHREAD_COUNT 2
+
+struct PthreadParams
+{
+    float dt;
+    float start;
+    float end;
+};
 
 class Program
 {
@@ -28,6 +38,12 @@ class Program
     float phase = 0;
     sf::Text fps;
     sf::Font font;
+    float incX = 2.f / SCREEN_WIDTH;
+    float incY = 2.f / SCREEN_HEIGHT;
+
+    pthread_barrier_t barrierStart, barrierEnd;
+    PthreadParams pthreadParams;
+    pthread_t pthreadIds[PTHREAD_COUNT];
 
 public:
     Program() : cameraPosition(0, 0.5, 0), sphereCenter(0.5, 0.25, 2), sphereCenter2(-0.5, 0.25, 2)
@@ -44,6 +60,18 @@ public:
         fps.setOutlineColor(sf::Color(0, 0, 0));
         fps.setString("CADORNA!!!");
         fps.setCharacterSize(24);
+
+        pthreadParams.dt = 0;
+        pthreadParams.start = 0.f;
+        pthreadParams.end = 0.f;
+
+        pthread_barrier_init(&barrierStart, NULL, 8);
+        pthread_barrier_init(&barrierEnd, NULL, 8);
+
+        for (int i = 0; i < PTHREAD_COUNT; i++)
+        {
+            pthread_create(&pthreadIds[i], NULL, renderSlice, &pthreadParams);
+        }
     }
 
     void runMainLoop(void)
@@ -66,11 +94,15 @@ public:
     }
 
 private:
+    static void *renderSlice(void *params)
+    {
+        PthreadParams *pParams = (PthreadParams *)params;
+        printf("rendering slice!!\n");
+        return NULL;
+    }
+
     void renderScene(float deltaTime)
     {
-        float incX = 2.f / SCREEN_WIDTH;
-        float incY = 2.f / SCREEN_HEIGHT;
-
         phase += deltaTime * 5.0;
         sphereCenter2.x = glm::sin(phase) * 0.5;
         sphereCenter2.z = glm::cos(phase) * 0.5 + 2;

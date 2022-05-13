@@ -1,6 +1,6 @@
 CC = g++
 FLAGS = -g -O0 -Wall
-LIBS = -lsfml-system -lsfml-graphics -lsfml-window
+LIBS = -lsfml-system -lsfml-graphics -lsfml-window -lpthread
 SRC = $(shell find src -name *.cpp)
 OBJ = $(patsubst %.cpp,%.o,$(SRC))
 TARGET = bin/main.bin
