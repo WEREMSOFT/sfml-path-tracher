@@ -24,13 +24,7 @@ struct PthreadParams
     float dt;
     float start;
     float end;
-    float incY;
-    float incX;
-    glm::vec3 sphereCenter;
-    glm::vec3 sphereCenter2;
-    glm::vec3 cameraPosition;
-    pthread_barrier_t *barrierStart, *barrierEnd;
-    Canvas *canvas;
+    Program *program;
 };
 
 class Program
@@ -73,14 +67,7 @@ public:
         {
             pthreadParams[i].start = -1 + step * i;
             pthreadParams[i].end = -1 + step * (i + 1);
-            pthreadParams[i].sphereCenter = sphereCenter;
-            pthreadParams[i].sphereCenter2 = sphereCenter2;
-            pthreadParams[i].incY = incY;
-            pthreadParams[i].incX = incX;
-            pthreadParams[i].barrierStart = &barrierStart;
-            pthreadParams[i].barrierEnd = &barrierEnd;
-            pthreadParams[i].cameraPosition = cameraPosition;
-            pthreadParams[i].canvas = &canvas;
+            pthreadParams[i].program = this;
             pthread_create(&pthreadIds[i], NULL, renderSlice, &pthreadParams[i]);
         }
     }
@@ -111,24 +98,24 @@ private:
         float phase = 0;
         while (1)
         {
-            pthread_barrier_wait(pParams->barrierStart);
+            pthread_barrier_wait(&pParams->program->barrierStart);
 
             phase += pParams->dt * 5.0;
-            pParams->sphereCenter2.x = glm::sin(phase) * 0.5;
-            pParams->sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
+            pParams->program->sphereCenter2.x = glm::sin(phase) * 0.5;
+            pParams->program->sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
 
-            pParams->sphereCenter.x = glm::sin(phase + glm::pi<float>()) * 0.5;
-            pParams->sphereCenter.z = glm::cos(phase + glm::pi<float>()) * 0.5 + 2;
+            pParams->program->sphereCenter.x = glm::sin(phase + glm::pi<float>()) * 0.5;
+            pParams->program->sphereCenter.z = glm::cos(phase + glm::pi<float>()) * 0.5 + 2;
 
-            for (float y = pParams->end; y > pParams->start; y -= pParams->incY)
+            for (float y = pParams->end; y > pParams->start; y -= pParams->program->incY)
             {
-                for (float x = -1.0; x < 1.0; x += pParams->incX)
+                for (float x = -1.0; x < 1.0; x += pParams->program->incX)
                 {
-                    float distance = glm::min(255.0, rayMarch(pParams->cameraPosition, glm::vec3(x, y, 1.0), pParams) * 100.0);
-                    pParams->canvas->setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, sf::Color(distance, distance, distance, 255));
+                    float distance = glm::min(255.0, pParams->program->rayMarch(pParams->program->cameraPosition, glm::vec3(x, y, 1.0)) * 100.0);
+                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, sf::Color(distance, distance, distance, 255));
                 }
             }
-            pthread_barrier_wait(pParams->barrierEnd);
+            pthread_barrier_wait(&pParams->program->barrierEnd);
         }
         return NULL;
     }
@@ -144,7 +131,7 @@ private:
         pthread_barrier_wait(&barrierEnd);
     }
 
-    static float rayMarch(glm::vec3 rayOrigin, glm::vec3 screenPosition, PthreadParams *params)
+    float rayMarch(glm::vec3 rayOrigin, glm::vec3 screenPosition)
     {
         // beyond this distance, we asume the ray didn't hit anything
         static float maxDistance = 100.0;
@@ -156,7 +143,7 @@ private:
         for (int i = 0; i < maxSteps; i++)
         {
             rayOrigin = rayOrigin + rayDirection * distanceToScene;
-            distanceToScene = distance(rayOrigin, params);
+            distanceToScene = distance(rayOrigin);
             distanceToOrigin += distanceToScene;
             if (distanceToScene < minDistance || distanceToOrigin > maxDistance)
                 break;
@@ -164,13 +151,13 @@ private:
         return distanceToOrigin;
     }
 
-    static float distance(glm::vec3 rayOrigin, PthreadParams *params)
+    float distance(glm::vec3 rayOrigin)
     {
 
         float sphereRadius = .50f;
 
-        auto distanceToSphere = glm::length(rayOrigin - params->sphereCenter) - sphereRadius;
-        auto distanceToSphere2 = glm::length(rayOrigin - params->sphereCenter2) - sphereRadius;
+        auto distanceToSphere = glm::length(rayOrigin - sphereCenter) - sphereRadius;
+        auto distanceToSphere2 = glm::length(rayOrigin - sphereCenter2) - sphereRadius;
 
         return glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere));
     }
