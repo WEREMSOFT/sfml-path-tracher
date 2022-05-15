@@ -21,7 +21,6 @@ class Program;
 
 struct PthreadParams
 {
-    float dt;
     float start;
     float end;
     Program *program;
@@ -39,6 +38,7 @@ class Program
     sf::Font font;
     float incX = 2.f / SCREEN_WIDTH;
     float incY = 2.f / SCREEN_HEIGHT;
+    float dt;
 
     pthread_barrier_t barrierStart, barrierEnd;
     PthreadParams pthreadParams[PTHREAD_COUNT];
@@ -76,14 +76,15 @@ public:
     {
         sf::Clock clock;
         char fpsString[500] = "";
+
         while (window->isOpen())
         {
-            float dt = clock.getElapsedTime().asSeconds();
-            snprintf(fpsString, 500, "fps: %.2f", 1.f / dt);
+            dt = clock.getElapsedTime().asSeconds();
+            snprintf(fpsString, 500, "fps: %.2f\nFrameTime: %.12f", 1.f / dt, dt);
             fps.setString(sf::String(fpsString));
             clock.restart();
             checkExitConditions();
-            renderScene(dt);
+            renderScene();
 
             canvas.draw(window);
             window->draw(fps);
@@ -100,7 +101,7 @@ private:
         {
             pthread_barrier_wait(&pParams->program->barrierStart);
 
-            phase += pParams->dt * 5.0;
+            phase += pParams->program->dt * 5.0;
             pParams->program->sphereCenter2.x = glm::sin(phase) * 0.5;
             pParams->program->sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
 
@@ -112,21 +113,29 @@ private:
                 for (float x = -1.0; x < 1.0; x += pParams->program->incX)
                 {
                     float distance = glm::min(255.0, pParams->program->rayMarch(pParams->program->cameraPosition, glm::vec3(x, y, 1.0)) * 100.0);
+
                     pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, sf::Color(distance, distance, distance, 255));
                 }
             }
+
             pthread_barrier_wait(&pParams->program->barrierEnd);
         }
         return NULL;
     }
 
-    void renderScene(float deltaTime)
+    static glm::vec3 getNormal(glm::vec3 point)
     {
-        for (int i = 0; i < PTHREAD_COUNT; i++)
-        {
-            pthreadParams[i].dt = deltaTime;
-        }
+        // float dist = distance(point);
+        // float e = 0.01;
+        // glm::vec3 normal = dist - glm::vec3(
+        //                               distance(point - glm::vec3(e, 0, 0)),
+        //                               distance(point - glm::vec3(0, e, 0)),
+        //                               distance(point - glm::vec3(0, 0, e)));
+        // return glm::normalize(normal);
+    }
 
+    void renderScene()
+    {
         pthread_barrier_wait(&barrierStart);
         pthread_barrier_wait(&barrierEnd);
     }
