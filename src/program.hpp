@@ -53,7 +53,7 @@ public:
                                           SCREEN_WIDTH * WINDOW_RATIO, SCREEN_HEIGHT * WINDOW_RATIO),
                                       "Path Tracer!!");
 
-        // window->setFramerateLimit(60);
+        window->setFramerateLimit(60);
         font.loadFromFile("resources/JetBrainsMono-Regular.ttf");
         fps.setFont(font);
         fps.setFillColor(sf::Color(255, 0, 0));
@@ -117,8 +117,11 @@ private:
                 for (float x = -1.0; x < 1.0; x += pParams->program->incX)
                 {
                     float distance = glm::min(255.0, pParams->program->rayMarch(pParams->program->cameraPosition, glm::vec3(x, y, 1.0)) * 100.0);
-
-                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, sf::Color(distance, distance, distance, 255));
+                    auto impactPoint = pParams->program->cameraPosition + glm::vec3(x, y, 1.0) * distance;
+                    glm::vec3 normal = pParams->program->getNormal(impactPoint);
+                    sf::Color color(normal.x * 255, normal.y * 255, normal.z * 255, 255);
+                    sf::Color depth(distance, distance, distance, 255);
+                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, depth);
                 }
             }
 
@@ -127,15 +130,15 @@ private:
         return NULL;
     }
 
-    static glm::vec3 getNormal(glm::vec3 point)
+    glm::vec3 getNormal(glm::vec3 point)
     {
-        // float dist = distance(point);
-        // float e = 0.01;
-        // glm::vec3 normal = dist - glm::vec3(
-        //                               distance(point - glm::vec3(e, 0, 0)),
-        //                               distance(point - glm::vec3(0, e, 0)),
-        //                               distance(point - glm::vec3(0, 0, e)));
-        // return glm::normalize(normal);
+        auto dist = distance(point);
+        float e = 0.01;
+        glm::vec3 normal = dist - glm::vec3(
+                                      distance(point - glm::vec3(e, 0, 0)),
+                                      distance(point - glm::vec3(0, e, 0)),
+                                      distance(point - glm::vec3(0, 0, e)));
+        return glm::normalize(normal);
     }
 
     void renderScene()
@@ -153,6 +156,7 @@ private:
         auto rayDirection = glm::normalize(screenPosition - rayOrigin);
         float distanceToScene = 0;
         float distanceToOrigin = 0;
+
         for (int i = 0; i < maxSteps; i++)
         {
             rayOrigin = rayOrigin + rayDirection * distanceToScene;
@@ -161,6 +165,7 @@ private:
             if (distanceToScene < minDistance || distanceToOrigin > maxDistance)
                 break;
         }
+
         return distanceToOrigin;
     }
 
