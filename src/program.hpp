@@ -14,8 +14,9 @@
 #include "canvas.hpp"
 #include <glm/glm.hpp>
 #include <threads.h>
+#include <unistd.h>
 
-#define PTHREAD_COUNT 17
+#define MAX_PTHREAD_COUNT 20
 
 class Program;
 
@@ -40,9 +41,10 @@ class Program
     float incY = 2.f / SCREEN_HEIGHT;
     float dt;
 
+    uint PTHREAD_COUNT = 0;
     pthread_barrier_t barrierStart, barrierEnd;
-    PthreadParams pthreadParams[PTHREAD_COUNT];
-    pthread_t pthreadIds[PTHREAD_COUNT];
+    PthreadParams pthreadParams[MAX_PTHREAD_COUNT];
+    pthread_t pthreadIds[MAX_PTHREAD_COUNT];
 
 public:
     Program() : cameraPosition(0, 0.5, 0), sphereCenter(0.5, 0.25, 2), sphereCenter2(-0.5, 0.25, 2)
@@ -59,6 +61,8 @@ public:
         fps.setOutlineColor(sf::Color(0, 0, 0));
         fps.setCharacterSize(24);
 
+        PTHREAD_COUNT = (uint)sysconf(_SC_NPROCESSORS_ONLN) + 1;
+
         pthread_barrier_init(&barrierStart, NULL, PTHREAD_COUNT + 1);
         pthread_barrier_init(&barrierEnd, NULL, PTHREAD_COUNT + 1);
 
@@ -66,7 +70,7 @@ public:
         for (int i = 0; i < PTHREAD_COUNT; i++)
         {
             pthreadParams[i].start = -1 + step * i;
-            pthreadParams[i].end = -1 + step * (i + 1);
+            pthreadParams[i].end = -1 + step * (i + 1.1);
             pthreadParams[i].program = this;
             pthread_create(&pthreadIds[i], NULL, renderSlice, &pthreadParams[i]);
         }

@@ -1,5 +1,5 @@
 CC = g++
-FLAGS = -O4 -Wall
+FLAGS = -g -O4 -Wall
 LIBS = -lsfml-system -lsfml-graphics -lsfml-window -lpthread
 SRC = $(shell find src -name *.cpp)
 OBJ = $(patsubst %.cpp,%.o,$(SRC))
