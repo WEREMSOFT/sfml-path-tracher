@@ -34,12 +34,14 @@ class Program
     Canvas canvas;
     glm::vec3 sphereCenter;
     glm::vec3 sphereCenter2;
-    float phase = 0;
+    float phase = glm::pi<float>() / 2;
     sf::Text fps;
     sf::Font font;
     float incX = 2.f / SCREEN_WIDTH;
     float incY = 2.f / SCREEN_HEIGHT;
     float dt;
+
+    bool invert = false;
 
     uint PTHREAD_COUNT = 0;
     pthread_barrier_t barrierStart, barrierEnd;
@@ -88,6 +90,12 @@ public:
             fps.setString(sf::String(fpsString));
             clock.restart();
             checkExitConditions();
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
+            {
+                invert = !invert;
+            }
+
             renderScene();
 
             canvas.draw(window);
@@ -100,12 +108,12 @@ private:
     static void *renderSlice(void *params)
     {
         PthreadParams *pParams = (PthreadParams *)params;
-        float phase = 0;
+        static float phase = glm::pi<float>() / 2;
         while (1)
         {
             pthread_barrier_wait(&pParams->program->barrierStart);
 
-            phase += pParams->program->dt * 5.0;
+            // phase += pParams->program->dt * 5.0;
             pParams->program->sphereCenter2.x = glm::sin(phase) * 0.5;
             pParams->program->sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
 
@@ -116,12 +124,14 @@ private:
             {
                 for (float x = -1.0; x < 1.0; x += pParams->program->incX)
                 {
-                    float distance = glm::min(255.0, pParams->program->rayMarch(pParams->program->cameraPosition, glm::vec3(x, y, 1.0)) * 100.0);
+                    float distance = pParams->program->rayMarch(pParams->program->cameraPosition, glm::vec3(x, y, 1.0));
+                    float adjustedDistance = glm::min<float>(distance * 100.f, 255.0);
                     auto impactPoint = pParams->program->cameraPosition + glm::vec3(x, y, 1.0) * distance;
                     glm::vec3 normal = pParams->program->getNormal(impactPoint);
                     sf::Color color(normal.x * 255, normal.y * 255, normal.z * 255, 255);
-                    sf::Color depth(distance, distance, distance, 255);
-                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, depth);
+
+                    sf::Color depth(adjustedDistance, adjustedDistance, adjustedDistance, 255);
+                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, pParams->program->invert ? color : depth);
                 }
             }
 
@@ -172,7 +182,7 @@ private:
     float distance(glm::vec3 rayOrigin)
     {
 
-        float sphereRadius = .50f;
+        float sphereRadius = .5f;
 
         auto distanceToSphere = glm::length(rayOrigin - sphereCenter) - sphereRadius;
         auto distanceToSphere2 = glm::length(rayOrigin - sphereCenter2) - sphereRadius;
