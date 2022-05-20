@@ -16,7 +16,7 @@
 #include <threads.h>
 #include <unistd.h>
 
-#define MAX_PTHREAD_COUNT 20
+#define MAX_PTHREAD_COUNT 1
 
 class Program;
 
@@ -34,16 +34,16 @@ class Program
     Canvas canvas;
     glm::vec3 sphereCenter;
     glm::vec3 sphereCenter2;
-    float phase = glm::pi<float>() / 2;
+    float phase = 0;
     sf::Text fps;
     sf::Font font;
     float incX = 2.f / SCREEN_WIDTH;
     float incY = 2.f / SCREEN_HEIGHT;
     float dt;
 
-    bool invert = false;
+    bool invert = true;
 
-    uint PTHREAD_COUNT = 0;
+    uint pthtreadCount = 0;
     pthread_barrier_t barrierStart, barrierEnd;
     PthreadParams pthreadParams[MAX_PTHREAD_COUNT];
     pthread_t pthreadIds[MAX_PTHREAD_COUNT];
@@ -63,13 +63,13 @@ public:
         fps.setOutlineColor(sf::Color(0, 0, 0));
         fps.setCharacterSize(24);
 
-        PTHREAD_COUNT = (uint)sysconf(_SC_NPROCESSORS_ONLN) + 1;
+        pthtreadCount = fmin(MAX_PTHREAD_COUNT, (uint)sysconf(_SC_NPROCESSORS_ONLN) + 1);
 
-        pthread_barrier_init(&barrierStart, NULL, PTHREAD_COUNT + 1);
-        pthread_barrier_init(&barrierEnd, NULL, PTHREAD_COUNT + 1);
+        pthread_barrier_init(&barrierStart, NULL, pthtreadCount + 1);
+        pthread_barrier_init(&barrierEnd, NULL, pthtreadCount + 1);
 
-        float step = 2.0 / PTHREAD_COUNT;
-        for (int i = 0; i < PTHREAD_COUNT; i++)
+        float step = 2.0 / pthtreadCount;
+        for (int i = 0; i < pthtreadCount; i++)
         {
             pthreadParams[i].start = -1 + step * i;
             pthreadParams[i].end = -1 + step * (i + 1.1);
@@ -86,9 +86,9 @@ public:
         while (window->isOpen())
         {
             dt = clock.getElapsedTime().asSeconds();
+            clock.restart();
             snprintf(fpsString, 500, "fps: %.2f\nFrameTime: %.12f", 1.f / dt, dt);
             fps.setString(sf::String(fpsString));
-            clock.restart();
             checkExitConditions();
 
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
@@ -108,12 +108,14 @@ private:
     static void *renderSlice(void *params)
     {
         PthreadParams *pParams = (PthreadParams *)params;
-        static float phase = glm::pi<float>() / 2;
+        float phase = 0;
         while (1)
         {
             pthread_barrier_wait(&pParams->program->barrierStart);
 
-            // phase += pParams->program->dt * 5.0;
+            if (pParams->program->invert)
+                phase += pParams->program->dt * 5.0;
+
             pParams->program->sphereCenter2.x = glm::sin(phase) * 0.5;
             pParams->program->sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
 
@@ -128,13 +130,16 @@ private:
                     float adjustedDistance = glm::min<float>(distance * 100.f, 255.0);
                     auto impactPoint = pParams->program->cameraPosition + glm::vec3(x, y, 1.0) * distance;
                     glm::vec3 normal = pParams->program->getNormal(impactPoint);
-                    sf::Color color(normal.x * 255, normal.y * 255, normal.z * 255, 255);
+                    sf::Color color(
+                        (normal.x < 0 ? 0 : normal.x) * 255.f,
+                        (normal.y < 0 ? 0 : normal.y) * 255.f,
+                        (normal.z < 0 ? 0 : normal.z) * 255.f,
+                        255);
 
                     sf::Color depth(adjustedDistance, adjustedDistance, adjustedDistance, 255);
-                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, pParams->program->invert ? color : depth);
+                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, color);
                 }
             }
-
             pthread_barrier_wait(&pParams->program->barrierEnd);
         }
         return NULL;
@@ -144,10 +149,11 @@ private:
     {
         auto dist = distance(point);
         float e = 0.01;
-        glm::vec3 normal = dist - glm::vec3(
-                                      distance(point - glm::vec3(e, 0, 0)),
-                                      distance(point - glm::vec3(0, e, 0)),
-                                      distance(point - glm::vec3(0, 0, e)));
+
+        glm::vec3 normal = dist - glm::vec3(distance(point - glm::vec3(e, 0, 0)),
+                                            distance(point - glm::vec3(0, e, 0)),
+                                            distance(point - glm::vec3(0, 0, e)));
+
         return glm::normalize(normal);
     }
 
@@ -181,12 +187,13 @@ private:
 
     float distance(glm::vec3 rayOrigin)
     {
-
         float sphereRadius = .5f;
 
         auto distanceToSphere = glm::length(rayOrigin - sphereCenter) - sphereRadius;
         auto distanceToSphere2 = glm::length(rayOrigin - sphereCenter2) - sphereRadius;
 
+        auto returnValue = glm::min(rayOrigin.y, distanceToSphere);
+        // return distanceToSphere;
         return glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere));
     }
 
