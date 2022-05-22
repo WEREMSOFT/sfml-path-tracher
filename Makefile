@@ -14,7 +14,13 @@ all: clean copy_assets $(OBJ)
 clean:
 	rm -rf $(OBJ) $(TARGET)
 
-run_main: all
+run_main: clean all
+	$(TARGET)
+
+set_release:
+	$(eval FLAGS := -g -O4 -Wall)
+
+run_release: clean set_release all
 	$(TARGET)
 
 copy_assets:

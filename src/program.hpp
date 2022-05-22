@@ -16,7 +16,7 @@
 #include <threads.h>
 #include <unistd.h>
 
-#define MAX_PTHREAD_COUNT 1
+#define MAX_PTHREAD_COUNT 50
 
 class Program;
 
@@ -114,7 +114,7 @@ private:
             pthread_barrier_wait(&pParams->program->barrierStart);
 
             if (pParams->program->invert)
-                phase += pParams->program->dt * 5.0;
+                phase += pParams->program->dt * 1.0;
 
             pParams->program->sphereCenter2.x = glm::sin(phase) * 0.5;
             pParams->program->sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
@@ -137,7 +137,10 @@ private:
                         255);
 
                     sf::Color depth(adjustedDistance, adjustedDistance, adjustedDistance, 255);
-                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, color);
+                    auto finalColor = depth;
+                    if ((y < 0 && x < 0) || (y > 0 && x > 0))
+                        finalColor = color;
+                    pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, finalColor);
                 }
             }
             pthread_barrier_wait(&pParams->program->barrierEnd);
@@ -148,7 +151,7 @@ private:
     glm::vec3 getNormal(glm::vec3 point)
     {
         auto dist = distance(point);
-        float e = 0.01;
+        float e = 0.001;
 
         glm::vec3 normal = dist - glm::vec3(distance(point - glm::vec3(e, 0, 0)),
                                             distance(point - glm::vec3(0, e, 0)),
@@ -192,8 +195,8 @@ private:
         auto distanceToSphere = glm::length(rayOrigin - sphereCenter) - sphereRadius;
         auto distanceToSphere2 = glm::length(rayOrigin - sphereCenter2) - sphereRadius;
 
-        auto returnValue = glm::min(rayOrigin.y, distanceToSphere);
-        // return distanceToSphere;
+        // auto returnValue = glm::min(rayOrigin.y, distanceToSphere);
+        // return glm::min(distanceToSphere2, distanceToSphere);
         return glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere));
     }
 
