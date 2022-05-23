@@ -69,7 +69,7 @@ public:
         pthread_barrier_init(&barrierEnd, NULL, pthtreadCount + 1);
 
         float step = 2.0 / pthtreadCount;
-        for (int i = 0; i < pthtreadCount; i++)
+        for (uint i = 0; i < pthtreadCount; i++)
         {
             pthreadParams[i].start = -1 + step * i;
             pthreadParams[i].end = -1 + step * (i + 1.1);
@@ -128,7 +128,8 @@ private:
                 {
                     float distance = pParams->program->rayMarch(pParams->program->cameraPosition, glm::vec3(x, y, 1.0));
                     float adjustedDistance = glm::min<float>(distance * 100.f, 255.0);
-                    auto impactPoint = pParams->program->cameraPosition + glm::vec3(x, y, 1.0) * distance;
+                    auto rayDirection = glm::normalize(glm::vec3(x, y, 1.0) - pParams->program->cameraPosition);
+                    auto impactPoint = pParams->program->cameraPosition + rayDirection * distance;
                     glm::vec3 normal = pParams->program->getNormal(impactPoint);
                     sf::Color color(
                         (normal.x < 0 ? 0 : normal.x) * 255.f,
@@ -138,8 +139,8 @@ private:
 
                     sf::Color depth(adjustedDistance, adjustedDistance, adjustedDistance, 255);
                     auto finalColor = depth;
-                    if ((y < 0 && x < 0) || (y > 0 && x > 0))
-                        finalColor = color;
+                    // if ((y < 0 && x < 0) || (y > 0 && x > 0))
+                    finalColor = color;
                     pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, finalColor);
                 }
             }
