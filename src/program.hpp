@@ -41,21 +41,19 @@ class Program
     float incY = 2.f / SCREEN_HEIGHT;
     float dt;
 
-    bool invert = true;
-
     uint pthtreadCount = 0;
     pthread_barrier_t barrierStart, barrierEnd;
     PthreadParams pthreadParams[MAX_PTHREAD_COUNT];
     pthread_t pthreadIds[MAX_PTHREAD_COUNT];
 
 public:
-    Program() : cameraPosition(0, 0.5, 0), sphereCenter(0.5, 0.25, 2), sphereCenter2(-0.5, 0.25, 2)
+    Program() : cameraPosition(0, 0.1, 0), sphereCenter(0.5, 0.25, 1), sphereCenter2(-0.5, 0.25, 1)
     {
         window = new sf::RenderWindow(sf::VideoMode(
                                           SCREEN_WIDTH * WINDOW_RATIO, SCREEN_HEIGHT * WINDOW_RATIO),
                                       "Path Tracer!!");
 
-        window->setFramerateLimit(60);
+        // window->setFramerateLimit(60);
         font.loadFromFile("resources/JetBrainsMono-Regular.ttf");
         fps.setFont(font);
         fps.setFillColor(sf::Color(255, 0, 0));
@@ -72,7 +70,7 @@ public:
         for (uint i = 0; i < pthtreadCount; i++)
         {
             pthreadParams[i].start = -1 + step * i;
-            pthreadParams[i].end = -1 + step * (i + 1.1);
+            pthreadParams[i].end = -1 + step * (i + 1);
             pthreadParams[i].program = this;
             pthread_create(&pthreadIds[i], NULL, renderSlice, &pthreadParams[i]);
         }
@@ -91,11 +89,6 @@ public:
             fps.setString(sf::String(fpsString));
             checkExitConditions();
 
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
-            {
-                invert = !invert;
-            }
-
             renderScene();
 
             canvas.draw(window);
@@ -112,10 +105,7 @@ private:
         while (1)
         {
             pthread_barrier_wait(&pParams->program->barrierStart);
-
-            if (pParams->program->invert)
-                phase += pParams->program->dt * 1.0;
-
+            phase += pParams->program->dt * 1.0;
             pParams->program->sphereCenter2.x = glm::sin(phase) * 0.5;
             pParams->program->sphereCenter2.z = glm::cos(phase) * 0.5 + 2;
 
@@ -139,8 +129,8 @@ private:
 
                     sf::Color depth(adjustedDistance, adjustedDistance, adjustedDistance, 255);
                     auto finalColor = depth;
-                    // if ((y < 0 && x < 0) || (y > 0 && x > 0))
-                    finalColor = color;
+                    if (x < 0)
+                        finalColor = color;
                     pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2, (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2, finalColor);
                 }
             }
@@ -152,7 +142,7 @@ private:
     glm::vec3 getNormal(glm::vec3 point)
     {
         auto dist = distance(point);
-        float e = 0.001;
+        static float e = 0.01;
 
         glm::vec3 normal = dist - glm::vec3(distance(point - glm::vec3(e, 0, 0)),
                                             distance(point - glm::vec3(0, e, 0)),
@@ -171,7 +161,7 @@ private:
     {
         // beyond this distance, we asume the ray didn't hit anything
         static float maxDistance = 100.0;
-        static float minDistance = 0.01;
+        static float minDistance = 0.001;
         static int maxSteps = 100;
         auto rayDirection = glm::normalize(screenPosition - rayOrigin);
         float distanceToScene = 0;
@@ -196,8 +186,6 @@ private:
         auto distanceToSphere = glm::length(rayOrigin - sphereCenter) - sphereRadius;
         auto distanceToSphere2 = glm::length(rayOrigin - sphereCenter2) - sphereRadius;
 
-        // auto returnValue = glm::min(rayOrigin.y, distanceToSphere);
-        // return glm::min(distanceToSphere2, distanceToSphere);
         return glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere));
     }
 
