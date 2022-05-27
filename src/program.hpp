@@ -33,10 +33,10 @@ struct PthreadParams
 
 struct Scene
 {
-    vec3 cameraPosition = {0, 1.f, -1.f};
+    vec3 cameraPosition = {0, 3.f, -1.f};
     vec3 sphereCenter = {0.5, 0.2, .5f};
     vec3 sphereCenter2 = {-.5, 0.2, 1.f};
-    vec3 lightPosition = {0, 9.71f, -4.2};
+    vec3 lightPosition = {0.f, 1.f, 0.f};
     fp_t sphereRadius = 0.1;
     fp_t sphere2Radius = 0.1;
 };
@@ -143,7 +143,7 @@ private:
         auto lightRay = glm::normalize(scene.lightPosition - point);
         fp_t lightIntensity = glm::clamp(glm::dot(normal, lightRay), 0.f, 1.0f);
 
-        fp_t distanceToLIght = rayMarch(point + normal * .1f, lightRay);
+        fp_t distanceToLIght = rayMarch(point + normal * .1f, scene.lightPosition);
 
         if (distanceToLIght < glm::length(scene.lightPosition - point))
         {
@@ -181,8 +181,8 @@ private:
     fp_t rayMarch(vec3 rayOrigin, vec3 screenPosition)
     {
         // beyond this distance, we asume the ray didn't hit anything
-        static fp_t maxDistance = 10.0;
-        static int maxSteps = 1000;
+        static fp_t maxDistance = 100.0;
+        static int maxSteps = 100;
         auto rayDirection = glm::normalize(screenPosition - rayOrigin);
         fp_t distanceToScene = 0;
         fp_t distanceToOrigin = 0;
