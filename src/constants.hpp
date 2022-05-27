@@ -1,5 +1,5 @@
 #pragma once
 
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 240
-#define WINDOW_RATIO 3
+#define SCREEN_WIDTH 1024
+#define SCREEN_HEIGHT 768
+#define WINDOW_RATIO 2

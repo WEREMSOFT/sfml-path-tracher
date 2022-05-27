@@ -19,6 +19,8 @@
 #define MAX_PTHREAD_COUNT 50
 #define SURFACE_MIN_DIST 0.01f
 
+typedef glm::dvec3 vec3;
+
 class Program;
 
 struct PthreadParams
@@ -30,12 +32,12 @@ struct PthreadParams
 
 struct Scene
 {
-    glm::vec3 cameraPosition = {0, 1.f, -1.f};
-    glm::vec3 sphereCenter = {0.5, 0.2, .5f};
-    glm::vec3 sphereCenter2 = {-.5, 0.2, 1.f};
-    glm::vec3 lightPosition = {0, 5, -5.2};
-    float sphereRadius = 0.1;
-    float sphere2Radius = 0.1;
+    vec3 cameraPosition = {0, 1.f, -1.f};
+    vec3 sphereCenter = {0.5, 0.2, .5f};
+    vec3 sphereCenter2 = {-.5, 0.2, 1.f};
+    vec3 lightPosition = {0, 9.71f, -4.2};
+    double sphereRadius = 0.1;
+    double sphere2Radius = 0.1;
 };
 
 class Program
@@ -70,7 +72,7 @@ public:
         fps.setOutlineColor(sf::Color(0, 0, 0));
         fps.setCharacterSize(24);
 
-        pthtreadCount = 13; // fmin(MAX_PTHREAD_COUNT, (uint)sysconf(_SC_NPROCESSORS_ONLN) + 1);
+        pthtreadCount = 8; // fmin(MAX_PTHREAD_COUNT, (uint)sysconf(_SC_NPROCESSORS_ONLN) + 1);
 
         pthread_barrier_init(&barrierStart, NULL, pthtreadCount + 1);
         pthread_barrier_init(&barrierEnd, NULL, pthtreadCount + 1);
@@ -110,28 +112,20 @@ private:
     static void *renderSlice(void *params)
     {
         PthreadParams *pParams = (PthreadParams *)params;
-        float phase = 0;
         while (1)
         {
             pthread_barrier_wait(&pParams->program->barrierStart);
-            phase += pParams->program->dt * 1.0;
-            pParams->program->scene.sphereCenter2.x = glm::sin(phase) * 0.2;
-            pParams->program->scene.sphereCenter2.z = glm::cos(phase) * 0.2 + 1;
-
-            pParams->program->scene.sphereCenter.x = glm::sin(phase + glm::pi<float>()) * 0.2;
-            pParams->program->scene.sphereCenter.z = glm::cos(phase + glm::pi<float>()) * 0.2 + 1;
-
             for (float y = pParams->end; y > pParams->start; y -= pParams->program->incY)
             {
                 for (float x = -1.0; x < 1.0; x += pParams->program->incX)
                 {
-                    float distance = pParams->program->rayMarch(pParams->program->scene.cameraPosition, glm::vec3(x, y, 1));
-                    auto rayDirection = glm::normalize(glm::vec3(x, y, 1.0) - pParams->program->scene.cameraPosition);
+                    auto distance = pParams->program->rayMarch(pParams->program->scene.cameraPosition, vec3(x, y, 1));
+                    auto rayDirection = glm::normalize(vec3(x, y, 1.0) - pParams->program->scene.cameraPosition);
                     auto impactPoint = pParams->program->scene.cameraPosition + rayDirection * distance;
 
                     auto lightComponent = glm::min<float>(glm::max<float>(pParams->program->getLight(impactPoint), 0), 255.f);
 
-                    sf::Color color(lightComponent * 250, lightComponent * 250, lightComponent * 250);
+                    sf::Color color(lightComponent * 255, lightComponent * 255, lightComponent * 255);
                     pParams->program->canvas.setPixel((x * SCREEN_WIDTH + SCREEN_WIDTH) / 2,
                                                       (y * -SCREEN_HEIGHT + SCREEN_HEIGHT) / 2,
                                                       color);
@@ -142,13 +136,13 @@ private:
         return NULL;
     }
 
-    float getLight(glm::vec3 point)
+    double getLight(vec3 point)
     {
         auto normal = getNormal(point);
         auto lightRay = glm::normalize(scene.lightPosition - point);
-        auto lightIntensity = glm::clamp(glm::dot(normal, lightRay), 0.f, 1.f);
+        double lightIntensity = glm::clamp(glm::dot(normal, lightRay), 0, 1.0);
 
-        float distanceToLIght = rayMarch(point + normal * .1f, lightRay);
+        double distanceToLIght = rayMarch(point + normal * .1, lightRay);
 
         if (distanceToLIght < glm::length(scene.lightPosition - point))
         {
@@ -171,18 +165,26 @@ private:
 
     void renderScene()
     {
+        static float phase = 0.0;
+        phase += dt * 1.0;
+        scene.sphereCenter2.x = glm::sin(phase) * 0.2;
+        scene.sphereCenter2.z = glm::cos(phase) * 0.2 + 1;
+
+        scene.sphereCenter.x = glm::sin(phase + glm::pi<float>()) * 0.2;
+        scene.sphereCenter.z = glm::cos(phase + glm::pi<float>()) * 0.2 + 1;
+
         pthread_barrier_wait(&barrierStart);
         pthread_barrier_wait(&barrierEnd);
     }
 
-    float rayMarch(glm::vec3 rayOrigin, glm::vec3 screenPosition)
+    double rayMarch(vec3 rayOrigin, vec3 screenPosition)
     {
         // beyond this distance, we asume the ray didn't hit anything
-        static float maxDistance = 100.0;
+        static double maxDistance = 10.0;
         static int maxSteps = 1000;
         auto rayDirection = glm::normalize(screenPosition - rayOrigin);
-        float distanceToScene = 0;
-        float distanceToOrigin = 0;
+        double distanceToScene = 0;
+        double distanceToOrigin = 0;
 
         for (int i = 0; i < maxSteps; i++)
         {
@@ -207,7 +209,7 @@ private:
     float distanceTorus(glm::vec3 point, glm::vec2 r)
     {
         float x = glm::length(glm::vec2(point.x, point.z)) - r.x;
-        return glm::length(glm::vec2(x, point.y + .4f)) - r.y;
+        return glm::length(glm::vec2(x, point.y + .35f)) - r.y;
     }
 
     void checkExitConditions(void)
