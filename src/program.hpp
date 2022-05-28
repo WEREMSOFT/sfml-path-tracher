@@ -67,7 +67,7 @@ public:
                                           SCREEN_WIDTH * WINDOW_RATIO, SCREEN_HEIGHT * WINDOW_RATIO),
                                       "Path Tracer!!");
 
-        window->setFramerateLimit(60);
+        // window->setFramerateLimit(60);
         font.loadFromFile("resources/JetBrainsMono-Regular.ttf");
         fps.setFont(font);
         fps.setFillColor(sf::Color(255, 0, 0));
@@ -214,7 +214,16 @@ private:
         auto distanceToSphere2 = glm::length(rayOrigin - scene.sphereCenter2) - scene.sphere2Radius;
         auto distanceToTorus = distanceTorus(rayOrigin - vec3(0, .5f, 1.0), scene.torusRadius);
         auto distanceToBox = distanceBox(rayOrigin - vec3(-.5f, .2f, 1.0), (vec3){.1f, .1f, .1f});
-        return glm::min(glm::min(glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere)), distanceToTorus), distanceToBox);
+        auto mergedTorusAndBox = glm::mix(distanceToBox, distanceToSphere, 0.5);
+        return smin(smin(smin(distanceToSphere2, smin(rayOrigin.y, distanceToSphere, .25), .25), distanceToTorus, .25), distanceToBox, .25);
+        // return glm::min(glm::min(glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere)), distanceToTorus), distanceToBox);
+        // return smin(smin(distanceToSphere, distanceToSphere2, 0.5), rayOrigin.y, .5);
+    }
+
+    fp_t smin(fp_t a, fp_t b, fp_t k)
+    {
+        auto h = glm::clamp(0.5 + 0.5 * (b - a) / k, 0., 1.);
+        return glm::mix(b, a, h) - k * h * (1. - h);
     }
 
     fp_t distanceTorus(vec3 point, glm::vec2 r)
