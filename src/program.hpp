@@ -13,7 +13,7 @@
 #include "constants.hpp"
 #include "canvas.hpp"
 #include <glm/glm.hpp>
-#include <threads.h>
+#include <xthreads.h>
 #include <unistd.h>
 
 #define MAX_PTHREAD_COUNT 50
