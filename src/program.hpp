@@ -19,6 +19,7 @@
 #define MAX_PTHREAD_COUNT 50
 #define SURFACE_MIN_DIST 0.01f
 
+// In case we need more presicion
 typedef glm::vec3 vec3;
 typedef float fp_t;
 
@@ -39,6 +40,7 @@ struct Scene
     vec3 lightPosition = {0.f, 1.f, 0.f};
     fp_t sphereRadius = 0.1;
     fp_t sphere2Radius = 0.1;
+    glm::vec2 torusRadius = {.2f, .1f};
 };
 
 class Program
@@ -65,7 +67,7 @@ public:
                                           SCREEN_WIDTH * WINDOW_RATIO, SCREEN_HEIGHT * WINDOW_RATIO),
                                       "Path Tracer!!");
 
-        // window->setFramerateLimit(60);
+        window->setFramerateLimit(60);
         font.loadFromFile("resources/JetBrainsMono-Regular.ttf");
         fps.setFont(font);
         fps.setFillColor(sf::Color(255, 0, 0));
@@ -73,7 +75,7 @@ public:
         fps.setOutlineColor(sf::Color(0, 0, 0));
         fps.setCharacterSize(24);
 
-        pthtreadCount = 20; // fmin(MAX_PTHREAD_COUNT, (uint)sysconf(_SC_NPROCESSORS_ONLN) + 1);
+        pthtreadCount = fmin(MAX_PTHREAD_COUNT, (uint)sysconf(_SC_NPROCESSORS_ONLN) + 3);
 
         pthread_barrier_init(&barrierStart, NULL, pthtreadCount + 1);
         pthread_barrier_init(&barrierEnd, NULL, pthtreadCount + 1);
@@ -174,6 +176,13 @@ private:
         scene.sphereCenter.x = glm::sin(phase + glm::pi<fp_t>()) * 0.2;
         scene.sphereCenter.z = glm::cos(phase + glm::pi<fp_t>()) * 0.2 + 1;
 
+        scene.lightPosition.x = glm::cos(phase * 0.5 + glm::pi<fp_t>()) * 3.f;
+        scene.lightPosition.z = glm::sin(phase * 0.5 + glm::pi<fp_t>()) * 3.f;
+
+        scene.cameraPosition.y = 1.5 + glm::sin(phase * 0.2 + glm::pi<fp_t>());
+
+        scene.torusRadius.x = 1.f + glm::sin(phase * 0.1 + glm::pi<fp_t>());
+
         pthread_barrier_wait(&barrierStart);
         pthread_barrier_wait(&barrierEnd);
     }
@@ -181,8 +190,8 @@ private:
     fp_t rayMarch(vec3 rayOrigin, vec3 screenPosition)
     {
         // beyond this distance, we asume the ray didn't hit anything
-        static fp_t maxDistance = 100.0;
-        static int maxSteps = 100;
+        static fp_t maxDistance = 50.0;
+        static int maxSteps = 30;
         auto rayDirection = glm::normalize(screenPosition - rayOrigin);
         fp_t distanceToScene = 0;
         fp_t distanceToOrigin = 0;
@@ -203,14 +212,21 @@ private:
     {
         auto distanceToSphere = glm::length(rayOrigin - scene.sphereCenter) - scene.sphereRadius;
         auto distanceToSphere2 = glm::length(rayOrigin - scene.sphereCenter2) - scene.sphere2Radius;
-        auto distanceToTorus = distanceTorus(rayOrigin - vec3(0, .5f, 1.0), glm::vec2(.2f, .1f));
-        return glm::min(glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere)), distanceToTorus);
+        auto distanceToTorus = distanceTorus(rayOrigin - vec3(0, .5f, 1.0), scene.torusRadius);
+        auto distanceToBox = distanceBox(rayOrigin - vec3(-.5f, .2f, 1.0), (vec3){.1f, .1f, .1f});
+        return glm::min(glm::min(glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere)), distanceToTorus), distanceToBox);
     }
 
     fp_t distanceTorus(vec3 point, glm::vec2 r)
     {
         fp_t x = glm::length(glm::vec2(point.x, point.z)) - r.x;
         return glm::length(glm::vec2(x, point.y + .35f)) - r.y;
+    }
+
+    fp_t distanceBox(vec3 point, vec3 size)
+    {
+        vec3 vec = glm::max(glm::abs(point) - size, 0.f);
+        return glm::length(vec);
     }
 
     void checkExitConditions(void)
