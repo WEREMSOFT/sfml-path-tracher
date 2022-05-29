@@ -13,7 +13,7 @@ class Canvas
 public:
     Canvas()
     {
-        canvasI.create(SCREEN_WIDTH, SCREEN_HEIGHT, (sf::Color){0, 0, 0});
+        canvasI.create(SCREEN_WIDTH, SCREEN_HEIGHT, sf::Color(0, 0, 0));
         canvasT.loadFromImage(canvasI);
         canvasS.setTexture(canvasT);
         canvasS.setScale(WINDOW_RATIO, WINDOW_RATIO);

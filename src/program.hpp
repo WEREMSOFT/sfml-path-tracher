@@ -13,8 +13,8 @@
 #include "constants.hpp"
 #include "canvas.hpp"
 #include <glm/glm.hpp>
-#include <xthreads.h>
-#include <unistd.h>
+#define HAVE_STRUCT_TIMESPEC
+#include <pthread.h>
 
 #define MAX_PTHREAD_COUNT 50
 #define SURFACE_MIN_DIST 0.01f
@@ -22,6 +22,7 @@
 // In case we need more presicion
 typedef glm::vec3 vec3;
 typedef float fp_t;
+typedef unsigned int uint;
 
 class Program;
 
@@ -75,7 +76,7 @@ public:
         fps.setOutlineColor(sf::Color(0, 0, 0));
         fps.setCharacterSize(24);
 
-        pthtreadCount = fmin(MAX_PTHREAD_COUNT, (uint)sysconf(_SC_NPROCESSORS_ONLN) + 3);
+        pthtreadCount = 17; // fmin(MAX_PTHREAD_COUNT, (uint)sysconf(_SC_NPROCESSORS_ONLN) + 3);
 
         pthread_barrier_init(&barrierStart, NULL, pthtreadCount + 1);
         pthread_barrier_init(&barrierEnd, NULL, pthtreadCount + 1);
@@ -213,7 +214,7 @@ private:
         auto distanceToSphere = glm::length(rayOrigin - scene.sphereCenter) - scene.sphereRadius;
         auto distanceToSphere2 = glm::length(rayOrigin - scene.sphereCenter2) - scene.sphere2Radius;
         auto distanceToTorus = distanceTorus(rayOrigin - vec3(0, .5f, 1.0), scene.torusRadius);
-        auto distanceToBox = distanceBox(rayOrigin - vec3(-.5f, .2f, 1.0), (vec3){.1f, .1f, .1f});
+        auto distanceToBox = distanceBox(rayOrigin - vec3(-.5f, .2f, 1.0), vec3(.1f, .1f, .1f));
         auto mergedTorusAndBox = glm::mix(distanceToBox, distanceToSphere, 0.5);
         return smin(smin(smin(distanceToSphere2, smin(rayOrigin.y, distanceToSphere, .25), .25), distanceToTorus, .25), distanceToBox, .25);
         // return glm::min(glm::min(glm::min(distanceToSphere2, glm::min(rayOrigin.y, distanceToSphere)), distanceToTorus), distanceToBox);
